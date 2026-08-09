@@ -1,0 +1,20 @@
+exposed_domains: []
+entity_config:
+    script.ac_on:
+      expose: true
+      name: "AC On"
+    script.ac_off:
+      expose: true
+      name: "AC Off"
+    script.projector_power:
+      expose: true
+      name: "Projector Power"
+    script.projector_source:
+      expose: true
+      name: "Projector Source"
+    script.projector_up:
+      expose: true
+      name: "Projector up"
+    script.projector_ok:
+      expose: true
+      name: "Projector ok"
