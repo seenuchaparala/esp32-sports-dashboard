@@ -12,7 +12,7 @@ const char* password = "restytayranhCw4";
 String teamIds[] = {"135701", "133610", "135797", "134934"}; 
 const int numTeams = 4;
 
-// --- CYD Touch Pins ---
+// --- CYD Touch Pins ----
 #define XPT2046_CS   33
 #define XPT2046_CLK  25
 #define XPT2046_MISO 39
