@@ -5,7 +5,7 @@
 #include <XPT2046_Touchscreen.h> 
 #include <time.h>
 
-// --- Configuration ---
+// --- Configuration ----
 const char* ssid = "Optus_5EC69F";
 const char* password = "restytayranhCw4";
 
