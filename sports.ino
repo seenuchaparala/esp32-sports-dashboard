@@ -29,7 +29,7 @@ struct Game {
   String teamInfo;
   String displayDate; 
   String gameTime;    
-  String sortKey;     
+  String sortKey;    
   String roundNum;
   String roundDesc;
   String venueLocation;
@@ -187,7 +187,6 @@ void displayTeamNewsFeed(String headerTitle, String espnUrl) {
   http.end();
 }
 
-// --- NEW FUNCTION: Fetch & Display Cowboys NFL NFC East Standings ---
 void displayCowboysStandings() {
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.drawCentreString("NFC EAST STANDINGS", 160, 5, 4);
@@ -200,22 +199,19 @@ void displayCowboysStandings() {
   }
 
   HTTPClient http;
-  // Live ESPN NFL Standings Endpoint API
   String url = "https://site.web.api.espn.com/apis/v2/sports/football/nfl/standings?seasontype=2&type=0&level=3";
   http.begin(url);
   int httpCode = http.GET();
 
   if (httpCode > 0) {
     String payload = http.getString();
-    DynamicJsonDocument doc(16000); // Larger allocation size required for multi-conference NFL JSON data trees
+    DynamicJsonDocument doc(16000); 
     deserializeJson(doc, payload);
 
-    // Navigate JSON structure to locate NFC (Index 1) -> NFC East (Index 1)
     JsonArray divisions = doc["children"][1]["children"];
     JsonObject nfcEast = divisions[1]; 
     JsonArray teams = nfcEast["standings"]["entries"];
 
-    // Render Table Headings
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.drawString("RK", 10, 42, 2);
     tft.drawString("TEAM", 50, 42, 2);
@@ -226,11 +222,11 @@ void displayCowboysStandings() {
     int rowY = 68;
     for (JsonObject team : teams) {
       String name = team["team"]["shortDisplayName"].as<String>();
-      String rank = team["stats"][20]["displayValue"].as<String>(); // Division rank entry index
-      String wlt  = team["stats"][0]["displayValue"].as<String>();  // Win-Loss-Tie string
-      String strk = team["stats"][12]["displayValue"].as<String>(); // Current streak string
+      String rank = team["stats"][20]["displayValue"].as<String>(); 
+      String wlt  = team["stats"][0]["displayValue"].as<String>();  
+      String strk = team["stats"][12]["displayValue"].as<String>(); 
 
-      if(name == "Cowboys") tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Highlight Cowboys row
+      if(name == "Cowboys") tft.setTextColor(TFT_YELLOW, TFT_BLACK); 
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
       tft.drawString(rank, 10, rowY, 2);
@@ -246,7 +242,89 @@ void displayCowboysStandings() {
   http.end();
 }
 
-// --- NEW FUNCTION: Fetch & Display Chelsea Contextual EPL Standings ---
+void displayCowboysFutureGames() {
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.drawCentreString("COWBOYS FUTURE GAMES", 160, 5, 4);
+  tft.drawFastHLine(10, 30, 300, TFT_DARKGREY);
+
+  if (WiFi.status() != WL_CONNECTED) {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.drawCentreString("WiFi Offline", 160, 100, 2);
+    return;
+  }
+
+  HTTPClient http;
+  String url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/dal/schedule";
+  http.begin(url);
+  int httpCode = http.GET();
+
+  if (httpCode > 0) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(16384);
+    deserializeJson(doc, payload);
+
+    JsonArray events = doc["events"].as<JsonArray>();
+    if (!events.isNull() && events.size() > 0) {
+      int rowY = 40;
+      int count = 0;
+      
+      for (JsonObject event : events) {
+        if (count >= 3) break;
+
+        JsonObject competition = event["competitions"][0];
+        bool completed = competition["status"]["type"]["completed"] | false;
+        
+        if (completed) continue;
+
+        String matchName = event["name"].as<String>();
+        String dateStr = event["date"].as<String>();
+
+        struct tm tm_utc = {0};
+        int yr = 0, mo = 0, dy = 0, hr = 0, mn = 0, sc = 0;
+        sscanf(dateStr.c_str(), "%d-%d-%dT%d:%d:%d", &yr, &mo, &dy, &hr, &mn, &sc);
+        
+        tm_utc.tm_year = yr - 1900;
+        tm_utc.tm_mon = mo - 1;
+        tm_utc.tm_mday = dy;
+        tm_utc.tm_hour = hr;
+        tm_utc.tm_min = mn;
+        tm_utc.tm_sec = sc;
+        
+        time_t time_utc = mktime(&tm_utc);
+        time_t time_aest = time_utc + (10 * 3600);
+        struct tm *tm_local = localtime(&time_aest);
+
+        char dateBuf[12];
+        char timeBuf[15];
+        strftime(dateBuf, sizeof(dateBuf), "%d/%m/%y", tm_local);
+        strftime(timeBuf, sizeof(timeBuf), "%H:%M %a", tm_local);
+
+        if (matchName.length() > 32) matchName = matchName.substring(0, 30) + "...";
+
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawString(matchName, 10, rowY, 2);
+        
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.drawString(String(dateBuf) + " @ " + String(timeBuf), 10, rowY + 18, 2);
+
+        rowY += 44;
+        count++;
+      }
+      if (count == 0) {
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.drawCentreString("No further games found.", 160, 100, 2);
+      }
+    } else {
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawCentreString("No further games scheduled.", 160, 100, 2);
+    }
+  } else {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.drawCentreString("Fetch Failed", 160, 100, 2);
+  }
+  http.end();
+}
+
 void displayChelseaStandings() {
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.drawCentreString("EPL LADDER CONTEXT", 160, 5, 4);
@@ -259,23 +337,21 @@ void displayChelseaStandings() {
   }
 
   HTTPClient http;
-  // Live ESPN English Premier League Standings Endpoint API
   String url = "https://site.api.espn.com/apis/v2/sports/soccer/eng.1/standings";
   http.begin(url);
   int httpCode = http.GET();
 
   if (httpCode > 0) {
     String payload = http.getString();
-    DynamicJsonDocument doc(24000); // High-capacity footprint allocation needed for full 20-team soccer ladders
+    DynamicJsonDocument doc(24000); 
     deserializeJson(doc, payload);
 
     JsonArray teams = doc["children"][0]["standings"]["entries"];
     int chelseaIdx = -1;
 
-    // First sweep: Locate Chelsea's precise index in the array data
     for (int i = 0; i < teams.size(); i++) {
       String id = teams[i]["team"]["id"].as<String>();
-      if (id == "363") { // ESPN global Chelsea Team ID
+      if (id == "363") { 
         chelseaIdx = i;
         break;
       }
@@ -288,23 +364,19 @@ void displayChelseaStandings() {
       return;
     }
 
-    // Determine viewport display bounds depending on user requested ranking scenarios
     int startIdx = 0;
-    int endIdx = 3; // Index limits default to Top 4 layout (0,1,2,3)
+    int endIdx = 3; 
 
     if (chelseaIdx >= 4) {
-      // Logic for outside Top 4: Show 2 teams directly above, Chelsea, and 1 team below
       startIdx = chelseaIdx - 2;
       endIdx = chelseaIdx + 1;
       
-      // Safety limit adjustments if Chelsea drops down to the bottom tier boundary
       if (endIdx >= teams.size()) {
         endIdx = teams.size() - 1;
         startIdx = endIdx - 3;
       }
     }
 
-    // Render Table Headers
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.drawString("POS", 10, 42, 2);
     tft.drawString("CLUB", 50, 42, 2);
@@ -317,12 +389,12 @@ void displayChelseaStandings() {
     for (int i = startIdx; i <= endIdx; i++) {
       JsonObject team = teams[i];
       String name = team["team"]["shortDisplayName"].as<String>();
-      String pos  = String(i + 1); // Rank position mapping index offset
-      String p    = team["stats"][0]["displayValue"].as<String>(); // Games Played
-      String gd   = team["stats"][8]["displayValue"].as<String>(); // Goal Difference
-      String pts  = team["stats"][3]["displayValue"].as<String>(); // Total Points
+      String pos  = String(i + 1); 
+      String p    = team["stats"][0]["displayValue"].as<String>(); 
+      String gd   = team["stats"][8]["displayValue"].as<String>(); 
+      String pts  = team["stats"][3]["displayValue"].as<String>(); 
 
-      if (i == chelseaIdx) tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Highlight Chelsea Row
+      if (i == chelseaIdx) tft.setTextColor(TFT_YELLOW, TFT_BLACK); 
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
       tft.drawString(pos, 10, rowY, 2);
@@ -347,17 +419,13 @@ void handleRowPress(int sortedIdx, String side) {
   Game game = allGames[originalIdx];
   
   if (side == "LEFT") {
-    // --- CUSTOMIZED LEFT PRESS LOGIC FOR COWBOYS & CHELSEA ---
     if (game.teamId == "134934") {
-      // Dallas Cowboys Trigger -> Renders NFL Table
       displayCowboysStandings();
     }
     else if (game.teamId == "133610") {
-      // Chelsea FC Trigger -> Renders Contextual EPL Table
       displayChelseaStandings();
     }
     else {
-      // Standard match information layout fallback for non-customized team profiles
       tft.setTextColor(TFT_CYAN, TFT_BLACK);
       tft.drawCentreString("MATCH FOCUS", 160, 5, 4);
       tft.drawFastHLine(10, 30, 300, TFT_DARKGREY);
@@ -398,14 +466,12 @@ void handleRowPress(int sortedIdx, String side) {
       tft.drawCentreString(formattedTime, 160, currentY, 4);
     }
   } else {
-    // --- RIGHT PRESS ROUTINES ---
     if (game.teamId == "133610") { 
       String chelseaUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/news?team=363";
       displayTeamNewsFeed("CHELSEA NEWS FEED", chelseaUrl);
     } 
     else if (game.teamId == "134934") { 
-      String cowboysUrl = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=6";
-      displayTeamNewsFeed("COWBOYS NEWS FEED", cowboysUrl);
+      displayCowboysFutureGames();
     } 
     else {
       tft.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -495,29 +561,35 @@ void loop() {
   static unsigned long lastTouchTime = 0;
 
   if (ts.touched()) {
-    if (millis() - lastTouchTime > 300) {
+    if (millis() - lastTouchTime > 400) {
       TS_Point p = ts.getPoint();
-      lastTouchTime = millis();
       
-      int pixelX = map(p.x, 240, 3800, 0, 320); 
-      int pixelY = map(p.y, 240, 3800, 0, 240);
+      // Filter out idle electrical noise and out-of-range coordinates
+      if (p.x > 200 && p.x < 3900 && p.y > 200 && p.y < 3900) {
+        lastTouchTime = millis();
+        
+        int pixelX = map(p.x, 240, 3800, 0, 320); 
+        int pixelY = map(p.y, 240, 3800, 0, 240);
 
-      if (isShowingDetailScreen) {
-        updateDisplay();
-      } else {
-        String pressedSide = (pixelX < 160) ? "LEFT" : "RIGHT";
+        if (pixelX >= 0 && pixelX <= 320 && pixelY >= 0 && pixelY <= 240) {
+          if (isShowingDetailScreen) {
+            updateDisplay();
+          } else {
+            String pressedSide = (pixelX < 160) ? "LEFT" : "RIGHT";
 
-        if (pixelY >= 35 && pixelY < 85 && rowHasGame[0]) {
-          handleRowPress(0, pressedSide);
-        } 
-        else if (pixelY >= 85 && pixelY < 135 && rowHasGame[1]) {
-          handleRowPress(1, pressedSide);
-        } 
-        else if (pixelY >= 135 && pixelY < 185 && rowHasGame[2]) {
-          handleRowPress(2, pressedSide);
-        } 
-        else if (pixelY >= 185 && pixelY <= 240 && rowHasGame[3]) {
-          handleRowPress(3, pressedSide);
+            if (pixelY >= 35 && pixelY < 85 && rowHasGame[0]) {
+              handleRowPress(0, pressedSide);
+            } 
+            else if (pixelY >= 85 && pixelY < 135 && rowHasGame[1]) {
+              handleRowPress(1, pressedSide);
+            } 
+            else if (pixelY >= 135 && pixelY < 185 && rowHasGame[2]) {
+              handleRowPress(2, pressedSide);
+            } 
+            else if (pixelY >= 185 && pixelY <= 240 && rowHasGame[3]) {
+              handleRowPress(3, pressedSide);
+            }
+          }
         }
       }
     }
