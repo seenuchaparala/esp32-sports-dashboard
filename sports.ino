@@ -561,11 +561,12 @@ void loop() {
   static unsigned long lastTouchTime = 0;
 
   if (ts.touched()) {
-    if (millis() - lastTouchTime > 400) {
-      TS_Point p = ts.getPoint();
-      
-      // Filter out idle electrical noise and out-of-range coordinates
-      if (p.x > 200 && p.x < 3900 && p.y > 200 && p.y < 3900) {
+    // Read raw coordinate directly
+    TS_Point p = ts.getPoint();
+
+    // Strict hardware boundary check for XPT2046 to filter out floating idle noise spikes
+    if (p.x > 300 && p.x < 3800 && p.y > 300 && p.y < 3800) {
+      if (millis() - lastTouchTime > 400) {
         lastTouchTime = millis();
         
         int pixelX = map(p.x, 240, 3800, 0, 320); 
